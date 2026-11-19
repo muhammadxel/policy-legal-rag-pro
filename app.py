@@ -8,6 +8,7 @@ except ImportError:
 
 import os
 import time
+import uuid
 import streamlit as st
 import chromadb
 from google import genai
@@ -35,18 +36,94 @@ if not api_key:
     st.stop()
 
 
-# --- Initialize Persistent Clients ---
+# --- Initialize Session-Isolated Vector Store & Gemini Client ---
 @st.cache_resource
-def init_system():
+def get_clients():
     chroma = chromadb.PersistentClient(path="./chroma_db")
-    collection = chroma.get_or_create_collection(name="policy_legal_docs")
-    retriever = HybridRetriever(collection)
     gemini = genai.Client(
         api_key=api_key,
-        http_options=types.HttpOptions(timeout=25000),  # 25-second timeout so it never hangs
+        http_options=types.HttpOptions(timeout=25000),
     )
-    return retriever, gemini
+    return chroma, gemini
 
+
+chroma_client, gemini_client = get_clients()
+
+if "session_collection_id" not in st.session_state:
+    st.session_state.session_collection_id = f"session_{uuid.uuid4().hex[:12]}"
+
+collection = chroma_client.get_or_create_collection(
+    name=st.session_state.session_collection_id
+)
+retriever = HybridRetriever(collection)
+
+
+def get_sample_legal_records() -> list[dict]:
+    """Return pre-built multi-document legal & HR policy records for instant one-click demo."""
+    return [
+        {
+            "id": "sample_msa_p1_c0",
+            "text": (
+                "MASTER SERVICES AGREEMENT (MSA-2026-09) — SECTION 1: PAYMENT TERMS & LATE PENALTIES. "
+                "Client shall pay all undisputed invoices within thirty (30) calendar days of receipt (Net 30). "
+                "Any overdue balance remaining unpaid after 30 days shall accrue late interest at 1.5% per month "
+                "(18% per annum). If an invoice remains unpaid for more than forty-five (45) days, Vendor reserves "
+                "the right to suspend all API and engineering deliverables upon 5 business days' written notice."
+            ),
+            "metadata": {
+                "source": "Sample_Master_Services_Agreement.pdf",
+                "page": 1,
+                "chunk_index": 0,
+                "file_type": "PDF",
+            },
+        },
+        {
+            "id": "sample_msa_p4_c0",
+            "text": (
+                "MASTER SERVICES AGREEMENT (MSA-2026-09) — SECTION 7: TERMINATION & IP OWNERSHIP. "
+                "Either party may terminate this Agreement for convenience upon sixty (60) days' prior written notice. "
+                "Upon termination, Client shall pay for all milestones completed up to the effective termination date. "
+                "All custom AI models, vector pipelines, and source code deliverables vest exclusively in Client upon "
+                "full settlement of final invoices, excluding Vendor's pre-existing proprietary utilities."
+            ),
+            "metadata": {
+                "source": "Sample_Master_Services_Agreement.pdf",
+                "page": 4,
+                "chunk_index": 0,
+                "file_type": "PDF",
+            },
+        },
+        {
+            "id": "sample_hr_p2_c0",
+            "text": (
+                "EMPLOYEE REMOTE WORK & DATA SECURITY POLICY (HR-POL-2026) — SECTION 3: CONFIDENTIALITY & AI TOOLS. "
+                "Employees handling client contracts, personally identifiable information (PII), or proprietary datasets "
+                "must never paste raw confidential records into unapproved public consumer AI chatbots. Only enterprise "
+                "zero-data-retention API endpoints and encrypted local vector stores are authorized for document analysis."
+            ),
+            "metadata": {
+                "source": "Sample_Employee_Security_Policy.docx",
+                "page": 2,
+                "chunk_index": 0,
+                "file_type": "DOCX",
+            },
+        },
+        {
+            "id": "sample_hr_p5_c0",
+            "text": (
+                "EMPLOYEE REMOTE WORK & DATA SECURITY POLICY (HR-POL-2026) — SECTION 6: INCIDENT REPORTING & BREACHES. "
+                "Any suspected loss of a company laptop, unauthorized API key exposure, or data leak must be reported "
+                "to the Information Security Officer within two (2) hours of discovery. Failure to report a security "
+                "incident within the 2-hour window may result in formal disciplinary action up to termination."
+            ),
+            "metadata": {
+                "source": "Sample_Employee_Security_Policy.docx",
+                "page": 5,
+                "chunk_index": 0,
+                "file_type": "DOCX",
+            },
+        },
+    ]
 
 retriever, gemini_client = init_system()
 
@@ -162,6 +239,13 @@ Grounded Answer with Citations:
 with st.sidebar:
     st.title("⚖️ Knowledge Base")
     st.caption("Hybrid Search (Vector + BM25) with Page-Level Citations")
+    if st.button("⚡ Load Sample Legal Docs (Demo)", use_container_width=True):
+        with st.spinner("Loading sample MSA & HR Security Policy..."):
+            retriever.add_records(get_sample_legal_records())
+            st.success("Loaded 2 sample documents! Try asking about payment penalties or breach reporting.")
+            st.rerun()
+
+    st.markdown("---")
 
     uploaded_files = st.file_uploader(
         "Upload Policy or Legal Documents",
