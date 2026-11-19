@@ -212,26 +212,26 @@ Grounded Answer with Citations:
 """
 
     # Try multiple model pools automatically if one experiences a 503 traffic spike
-    candidate_models = [
+   candidate_models = [
         "gemini-3.8-flash",
         "gemini-3.5-flash",
         "gemini-3.8-flash-lite",
-        "gemini-3.5-flash-lite",
-        "gemini-2.5-flash",
     ]
     last_error = ""
 
-    for model_name in candidate_models:
-        try:
-            response = gemini_client.models.generate_content(
-                model=model_name,
-                contents=system_prompt,
-            )
-            return response.text
-        except Exception as e:
-            last_error = str(e)
-            # Immediately move to the next model pool on 503, 429, 404, or timeout
-            continue
+    for attempt in range(2):
+        for model_name in candidate_models:
+            try:
+                response = gemini_client.models.generate_content(
+                    model=model_name,
+                    contents=system_prompt,
+                )
+                return response.text
+            except Exception as e:
+                last_error = str(e)
+                if "404" in last_error:
+                    continue
+                time.sleep(1)
 
     return f"All Gemini model pools are currently busy (Last error: {last_error}). Please retry in a few seconds."
 
