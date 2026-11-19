@@ -1,0 +1,8 @@
+streamlit
+chromadb
+google-genai
+pypdf
+python-docx
+rank-bm25
+python-dotenv
+pysqlite3-binary
