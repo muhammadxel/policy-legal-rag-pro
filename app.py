@@ -125,8 +125,6 @@ def get_sample_legal_records() -> list[dict]:
         },
     ]
 
-retriever, gemini_client = init_system()
-
 
 # --- Query Reformulation for Conversational Memory ---
 def contextualize_query(user_query: str, chat_history: list[dict]) -> str:
