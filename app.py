@@ -212,7 +212,7 @@ Grounded Answer with Citations:
 """
 
     # Try multiple model pools automatically if one experiences a 503 traffic spike
-   candidate_models = [
+  candidate_models = [
         "gemini-3.8-flash",
         "gemini-3.5-flash",
         "gemini-3.8-flash-lite",
